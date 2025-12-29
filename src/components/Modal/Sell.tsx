@@ -56,7 +56,7 @@ const Sell: React.FC<SellProps> = ({ status, toggleModalSell,setItems}) => {
           const result = reader.result as string;
 
           if(result){
-            localStorage.setItem(`image_${file.name}`,result);
+            // localStorage.setItem(`image_${file.name}`,result);
             resolve(result);
           }else{
             reject("FileReader result as null");
