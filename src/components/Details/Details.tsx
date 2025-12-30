@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import Navbar from "../Navbar/Navbar";
-import { useLocation } from "react-router-dom";
+import { useLocation,Link } from "react-router-dom";
 import { useItems } from "../Context/ItemsContext";
 import Login from "../Modal/Login";
 import Sell from "../Modal/Sell";
+import Footer from "../Footer/Footer";
 
 const Details:React.FC = () => {
   const location = useLocation();
@@ -17,10 +18,32 @@ const Details:React.FC = () => {
   const toggleModal = () => setModal(!openModal);
   const toggleModalSell = () => setModalSell(!openModalSell);
 
+  const dummySetCategory = () => {};
+
   return (
     <div>
-      <Navbar toggleModalSell={toggleModalSell} toggleModal={toggleModal} />
+      <Navbar toggleModalSell={toggleModalSell} toggleModal={toggleModal} selectedCategory="" setCategory={dummySetCategory}/>
       <Login toggleModal={toggleModal} status={openModal} />
+
+    <div className="p-4 px-5 sm:px-15 md:px-30 lg:px-40 mt-4">
+          <nav className="flex text-sm text-gray-500 items-center">
+              <Link to="/" className="hover:text-[#002f34] font-bold transition-colors">
+                  Home
+              </Link>
+              
+              <span className="mx-2 text-gray-400">/</span>
+              
+              <span className="uppercase text-xs font-semibold text-gray-500">
+                  {item?.category || "Category"}
+              </span>
+              
+              <span className="mx-2 text-gray-400">/</span>
+              
+              <span className="text-gray-400 truncate max-w-50">
+                  {item?.title}
+              </span>
+          </nav>
+      </div>
 
       <div className="grid gap-0 sm:gap-5 grid-cols-1 sm:grid-cols-1 md:grid-cols-2 p-10 px-5 sm:px-15 md:px-30 lg:px-40">
         <div className="border-2 w-full rounded-lg flex justify-center overflow-hidden h-96 bg-gray-100">
@@ -55,6 +78,7 @@ const Details:React.FC = () => {
         toggleModalSell={toggleModalSell} 
         status={openModalSell} 
       />
+      <Footer/>
     </div>
   );
 };

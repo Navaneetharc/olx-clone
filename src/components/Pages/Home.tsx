@@ -13,6 +13,8 @@ const Home: React.FC= () => {
   const [openModal, setModal] = useState<boolean>(false);
   const [openModalSell, setModalSell] = useState<boolean>(false);
 
+  const [category, setCategory] = useState<string>('All');
+
   const toggleModal = () => {setModal(prev => !prev)}
   const toggleModalSell = () => {setModalSell(prev => !prev)}
 
@@ -30,12 +32,17 @@ const Home: React.FC= () => {
     console.log('Updated Items: ',items);
   },[items])
 
+  const filteredItems = category === 'All' ? items : items?.filter((item) => item.category === category);
+
   return (
     <div>
-      <Navbar toggleModal = {toggleModal} toggleModalSell={toggleModalSell}/>
+      <Navbar toggleModal = {toggleModal}
+       toggleModalSell={toggleModalSell}
+       selectedCategory={category}
+       setCategory={setCategory}/>
       <Login toggleModal = {toggleModal} status = {openModal}/>
       <Sell setItems = {setItems} toggleModalSell={toggleModalSell} status = {openModalSell}/>
-      <Card items={items || []}/>
+      <Card items={filteredItems || []}/>
       <Footer/>
     </div>
   )

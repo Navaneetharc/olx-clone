@@ -14,9 +14,11 @@ import { useNavigate } from "react-router-dom";
 interface NavbarProps{
   toggleModal: () => void;
   toggleModalSell: () => void;
+  selectedCategory: string;
+  setCategory: (category: string) => void;
 }
 
-const Navbar:React.FC<NavbarProps> = ({toggleModal,toggleModalSell}) => {
+const Navbar:React.FC<NavbarProps> = ({toggleModal,toggleModalSell,selectedCategory,setCategory}) => {
   const [user] = useAuthState(auth);
   const [dropdownOpen,setDropdownOpen] = useState<boolean>(false);
   const navigate = useNavigate();
@@ -30,6 +32,20 @@ const Navbar:React.FC<NavbarProps> = ({toggleModal,toggleModalSell}) => {
       console.error("Error loggingout : ",error);
     }
   }
+
+  const goToMyAds = () => {
+    navigate('/my-ads');
+  }
+
+  const categories: string[] = [
+    "Cars",
+    "Motorcycles",
+    "Mobile Phones",
+    "For Sale: Houses & Apartments",
+    "Scooters",
+    "Commercial & Other Vehicles",
+    "For Rent: Houses & Apartments"
+  ]
 
   return (
     <div>
@@ -80,6 +96,12 @@ const Navbar:React.FC<NavbarProps> = ({toggleModal,toggleModalSell}) => {
                    >
                     Logout
                   </button>
+                  <button
+                   className="text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition-colors w-full font-bold"
+                   onClick={goToMyAds}
+                   >
+                    My Ads
+                  </button>
                 </div>
               )}
             </div>
@@ -100,23 +122,29 @@ const Navbar:React.FC<NavbarProps> = ({toggleModal,toggleModalSell}) => {
         
         
       </nav>
-      <div className="w-full relative z-0 flex shadow-md p-2 pt-2 pl-10 pr-10 sm:pl-44 md:pr-44 sub-lists">
-          <ul className="list-none flex items-center justify-between w-full">
-            <div className="flex shrink-0">
-              <p className="font-semibold uppercase all-cats">All categories</p>
-              {/* <img className="w-4 ml-2" src={arrow} alt="" /> */}
+      <div className="w-full bg-white shadow-sm p-2 flex justify-center text-sm border-t border-gray-200">
+         <div className="w-full max-w-7xl flex items-center gap-5 px-4 overflow-x-auto whitespace-nowrap scrollbar-hide">
+            
+            <div 
+                className={`flex items-center font-bold uppercase cursor-pointer shrink-0 ${selectedCategory === "All" ? "text-teal-600" : ""}`}
+                onClick={() => setCategory("All")}
+            >
+              All Categories
+              {selectedCategory === "All" && <img className="w-4 ml-1" src="" alt="" />}
             </div>
 
-           <p className="cursor-pointer hover:text-teal-600">Cars</p>
-            <p className="cursor-pointer hover:text-teal-600">Motorcycles</p>
-            <p className="cursor-pointer hover:text-teal-600">Mobile Phones</p>
-            <p className="cursor-pointer hover:text-teal-600">For Sale: Houses & Apartments</p>
-            <p className="cursor-pointer hover:text-teal-600">Scooters</p>
-            <p className="cursor-pointer hover:text-teal-600">Commercial & Other Vehicles</p>
-            <p className="cursor-pointer hover:text-teal-600">For Rent: Houses & Apartments</p>
-           
-          </ul>
-        </div>
+            {categories.map((cat) => (
+                <p 
+                    key={cat}
+                    onClick={() => setCategory(cat)}
+                    className={`cursor-pointer transition-colors ${selectedCategory === cat ? "text-teal-600 font-bold" : "hover:text-teal-600"}`}
+                >
+                    {cat}
+                </p>
+            ))}
+            
+         </div>
+      </div>
     </div>
   )
 }

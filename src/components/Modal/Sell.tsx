@@ -1,79 +1,81 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal, ModalBody } from "flowbite-react";
 import Input from '../Input/Input';
 import { UserAuth } from "../Context/useAuth";
-import { addDoc, collection } from 'firebase/firestore';
+import { addDoc, collection, doc, updateDoc } from 'firebase/firestore'; 
 import { fecthFromFireStore, fireStore } from '../Firebase/Firebase';
 import type { Product } from '../Context/ItemsContext';
+import { showAlert } from '../../utils/swal';
 import fileUpload from '../../assets/fileUpload.svg';
-import loading from '../../assets/loading.gif'
-
+import loadingIcon from '../../assets/loading.gif';
 
 interface SellProps {
   status: boolean;
   toggleModalSell: () => void;
-  setItems: (items:Product[]) => void;
+  setItems: React.Dispatch<React.SetStateAction<Product[] | null>>;
+  editData?: Product | null; 
+  refreshData?: () => void;  
 }
 
-const Sell: React.FC<SellProps> = ({ status, toggleModalSell,setItems}) => {
+const Sell: React.FC<SellProps> = ({ status, toggleModalSell, setItems, editData, refreshData }) => {
   const [title, setTitle] = useState<string>('');
   const [category, setCategory] = useState<string>('');
-  const [price, setPrice] = useState<number | ''>(''); 
+  const [price, setPrice] = useState<number | ''>('');
   const [description, setDescription] = useState<string>('');
-  const [image,setImage] = useState<File | null>(null);
+  const [image, setImage] = useState<File | null>(null);
   
+  const [existingImageURL, setExistingImageURL] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const { user } = UserAuth();
 
-  const { user } = UserAuth(); 
+  const categories = [
+    "Cars", "Motorcycles", "Mobile Phones", "For Sale: Houses & Apartments",
+    "Scooters", "Commercial & Other Vehicles", "For Rent: Houses & Apartments"
+  ];
 
-  const categories:string[] = [
-    "Cars",
-    "Motorcycles",
-    "Mobile Phones",
-    "For Sale: Houses & Apartments",
-    "Scooters",
-    "Commercial & Other Vehicles",
-    "For Rent: Houses & Apartments"
-  ]
+  useEffect(() => {
+    if (editData && status) {
+        setTitle(editData.title);
+        setCategory(editData.category);
+        setPrice(editData.price);
+        setDescription(editData.description);
+        setExistingImageURL(editData.imageURL);
+        setImage(null); 
+    } else if (!editData && status) {
+        setTitle('');
+        setCategory('');
+        setPrice('');
+        setDescription('');
+        setExistingImageURL('');
+        setImage(null);
+    }
+  }, [editData, status]);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if(event.target.files && event.target.files[0]) setImage(event.target.files[0]);
+    if (event.target.files && event.target.files[0]) setImage(event.target.files[0]);
   }
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    if (!user) {
-      alert("Please login to continue");
-      return;
-    }
-
+    if (!user) return showAlert("Login Required", "Please login to post an ad.", "warning");
     setSubmitting(true);
 
     const readImageAsDataURL = (file: File): Promise<string> => {
-      return new Promise((resolve,reject) => {
+      return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onloadend = () => {
-          const result = reader.result as string;
-
-          if(result){
-            // localStorage.setItem(`image_${file.name}`,result);
-            resolve(result);
-          }else{
-            reject("FileReader result as null");
-          }
-        }
-        reader.onerror = reject
-        reader.readAsDataURL(file)
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
       })
     }
 
-    let CurrentImageURL = '';
-    if(image){
+    let finalImageURL = existingImageURL; 
+
+    if (image) {
       try {
-        CurrentImageURL = await readImageAsDataURL(image)
+        finalImageURL = await readImageAsDataURL(image);
       } catch (error) {
-        console.log(error)
-        alert('Failed to read image');
+        console.error(error);
         setSubmitting(false);
         return;
       }
@@ -90,34 +92,41 @@ const Sell: React.FC<SellProps> = ({ status, toggleModalSell,setItems}) => {
       return;
     }
 
-    try {
-      await addDoc(collection(fireStore, 'products'), {
-        title: trimmedTitle,       
-        category: trimmedCategory, 
+    const payload = {
+        title: trimmedTitle,
+        category: trimmedCategory,
         price: finalPrice,
         description: trimmedDescription,
-        imageURL: CurrentImageURL,
+        imageURL: finalImageURL,
         userId: user.uid,
         userName: user.displayName || 'Anonymous',
-        createAt: new Date().toISOString() 
-      });
+        createAt: editData ? editData.createAt : new Date().toISOString()
+    };
 
-      setImage(null);
-      setTitle('');
-      setCategory('');
-      setPrice('');
-      setDescription('');
+    try {
 
-      alert("Ad posted successfully!");
+      if (editData) {
+        await updateDoc(doc(fireStore, "products", editData.id), payload);
+        await showAlert("Success!", "Your ad has been updated.", "success");
+        if(refreshData) refreshData(); 
+
+      } else {
+
+        await addDoc(collection(fireStore, 'products'), payload);
+        await showAlert("Success!", "Your ad is now live.", "success");
+
+        if(refreshData){
+          refreshData();
+        }else{
+          const datas = await fecthFromFireStore(); 
+          setItems(datas as Product[]);
+        }
+      }
+
       toggleModalSell();
-
-      const datas = await fecthFromFireStore();
-      setItems(datas as Product[]);
-      
-
     } catch (error) {
-      console.log(error);
-      alert("Failed to add items to the firestore");
+      console.error(error);
+      showAlert("Error", "Something went wrong while saving your ad.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -131,107 +140,67 @@ const Sell: React.FC<SellProps> = ({ status, toggleModalSell,setItems}) => {
 
   return (
     <div>
-      <Modal
-        theme={{
-          "root": {
-          "base": "fixed inset-0 z-50 h-full overflow-y-auto overflow-x-hidden md:inset-0",
-          "show": {
-            "on": "flex bg-black/85", 
-            "off": "hidden"
-          },
-        },
-        "content": {
-          "base": "relative w-full p-4 md:h-auto",
-          "inner": "relative flex max-h-[90dvh] flex-col rounded-lg bg-white shadow dark:bg-gray-700"
-        }
-        }}
-        show={status}
-        onClose={toggleModalSell} 
-        position={'center'}
-        size='md'
-        popup={true}
-      >
+      <Modal show={status} onClose={toggleModalSell} position={'center'} size='md' popup={true}>
         <ModalBody className="p-0">
-          <div className='bg-white rounded-lg p-4 relative overflow-x-hidden' onClick={(event) => event.stopPropagation()}>
-            
+          <div className='bg-white rounded-lg p-4 relative overflow-x-hidden' onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-2">
-                <h2 className='font-bold text-xl text-[#002f34] tracking-wide'>POST YOUR AD</h2>
-                <div onClick={() => {
-                  toggleModalSell();
-                  setImage(null);
-                  setTitle('');
-                  setCategory('');
-                  setPrice('');
-                  setDescription('');
-                }}>
-                    <CloseIcon />
-                </div>
+              <h2 className='font-bold text-xl text-[#002f34] tracking-wide'>
+                  {editData ? "EDIT AD" : "POST YOUR AD"}
+              </h2>
+              <div onClick={toggleModalSell}><CloseIcon /></div>
             </div>
 
             <form onSubmit={handleSubmit} className='flex flex-col gap-2'>
-              <Input 
-                value={title} 
-                setInput={setTitle} 
-                placeholder='Ad Title' 
-              />
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full p-3 border-2 border-black rounded-md outline-none focus:border-teal-400 bg-white text-gray-700"
-                required
-              >
+              <Input value={title} setInput={setTitle} placeholder='Ad Title' />
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full p-3 border-2 border-black rounded-md outline-none focus:border-teal-400 bg-white" required>
                 <option value="" disabled>Select Category</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
+                {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
               </select>
-              
-              <Input 
-                value={price} 
-                setInput={(val) => setPrice(val === '' ? '' : Number(val))} 
-                placeholder='Price' 
-                type="number"
-              />
-              <Input 
-                value={description} 
-                setInput={setDescription} 
-                placeholder='Description' 
-              />
+              <Input value={price} setInput={(val) => setPrice(val === '' ? '' : Number(val))} placeholder='Price' type="number" />
+              <Input value={description} setInput={setDescription} placeholder='Description' />
 
               <div className='pt-2 w-full relative'>
-              {image ? (
-                <div className='relative h-24 w-full flex justify-center border-2 border-black border-solid rounded-md overflow-hidden'>
-                  <img className='object-contain' src={URL.createObjectURL(image)} alt="" />
-                </div>
-              ) : (
-                <div className='relative h-49 w-full border-2 border-black border-solid rounded-md'>
-                  <input 
-                   onChange={handleImageUpload}
-                   type='file'
-                   className='absolute inset-10 h-full w-full opacity-0 cursor-pointer z-30'
-                   required />
-
-                  <div className='absolute top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] flex flex-col items-center'>
-                    <img className='w-12' src={fileUpload} alt="" />
-                    <p className='text-center text-sm pt-2'>Click to upload images</p>
-                    <p className='text-center text-sm pt-2'>SVG, PNG, JPG</p>
-                    
+                {image ? (
+                  <div className='h-24 w-full flex justify-center border-2 border-black rounded-md overflow-hidden'>
+                    <img className='object-contain' src={URL.createObjectURL(image)} alt="Preview" />
                   </div>
-                </div>
-              )}
+                ) : existingImageURL ? (
+                   <div className='h-24 w-full flex justify-center border-2 border-black rounded-md overflow-hidden relative'>
+                        <img className='object-contain opacity-50' src={existingImageURL} alt="Existing" />
+                        <div className='absolute inset-0 flex items-center justify-center'>
+                            <p className='bg-white/80 px-2 py-1 text-xs font-bold rounded'>Click to Change Image</p>
+                            <input 
+                              onChange={handleImageUpload} 
+                              type='file' 
+                              className='absolute inset-0 opacity-0 cursor-pointer z-10' 
+                            />
+                        </div>
+                   </div>
+                ) : (
+                  <div className='relative h-24 w-full border-2 border-black rounded-md'>
+                    
+                    <input 
+                      onChange={handleImageUpload} 
+                      type='file' 
+                      className='absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10' 
+                      required={!editData} 
+                    />
+                    
+                    <div className='absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center'>
+                      <img className='w-8' src={fileUpload} alt="" />
+                      <p className='text-xs pt-1'>Click to upload</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="mt-4">
                 {submitting ? (
-                  <div  className="w-full flex h-14 justify-center pt-4 pb-2">
-                    <img className="w-32 object-cover" src={loading} alt="" />
-                  </div>
+                  <div className="flex justify-center"><img className="w-16" src={loadingIcon} alt="loading" /></div>
                 ) : (
-                  <div  className="w-full pt-0">
-                    <button  className="w-full p-2 rounded-lg text-white font-bold"
-                     style={{ backgroundColor: '#002f34' }}
-                    > Sell Item </button>
-                  </div>
+                  <button className="w-full p-2 rounded-lg text-white font-bold bg-[#002f34]">
+                      {editData ? "Update Ad" : "Sell Item"}
+                  </button>
                 )}
               </div>
             </form>
